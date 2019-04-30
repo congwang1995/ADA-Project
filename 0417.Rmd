@@ -1,0 +1,232 @@
+---
+title: "Untitled"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(Hmisc)
+
+library(readr) #for read txt file
+library(knitr) #for creating nicer tables
+library(gdata)
+library(data.table)
+
+demo <- sasxport.get("DEMO_I.xpt")
+diet1 <- sasxport.get("DR1TOT_I.xpt")
+diet2 <- sasxport.get("DR2TOT_I.xpt")
+chd <- sasxport.get("MCQ_I.xpt")
+alc <- sasxport.get("ALQ_I.xpt")
+smoke <- sasxport.get("SMQ_I.xpt")
+bmi <- sasxport.get("BMX_I.xpt")
+pa <- sasxport.get("PAQ_I.xpt")
+hyp <- sasxport.get("BPQ_I.xpt")
+
+
+diet <- merge(diet1, diet2, by = 'seqn', all = T, sort = T)
+alcsmk <- merge(alc, smoke, by = 'seqn', all = T, sort = T)
+demochd <- merge(demo, chd, by = 'seqn', all = T, sort = T)
+covariates <- merge(diet, alcsmk, by = 'seqn', all = T, sort = T)
+wholedata <- merge(demochd, covariates, by = 'seqn', all = T, sort = T)
+wholedata <- merge(wholedata, bmi, by = 'seqn', all = T, sort = T)
+wholedata <- merge(wholedata, pa, by = 'seqn', all = T, sort = T)
+wholedata <- merge(wholedata, hyp, by = 'seqn', all = T, sort = T)
+
+varlist <- c("seqn", "ridageyr", "riagendr", "ridreth3", "dr1ttfat", "dr2ttfat", "dr1tchol", "dr2tchol", "dr1tkcal", "dr2tkcal", "alq101", "smq020", "mcq160c", "dr1tsfat", "dr2tsfat", "bmxbmi", "paq605", "dr1tprot", "dr2tprot", "dr1tcarb","dr2tcarb", "dr1tsugr","dr2tsugr", "dr1tfibe","dr2tfibe","bpq020","dr1tvara","dr2tvara","dr1tvb1","dr2tvb1","dr1tvb2","dr2tvb2","dr1tvb6","dr2tvb6","dr1tvb12","dr2tvb12","dr1tvc","dr2tvc","dr1tvd","dr2tvd","dr1tvk","dr2tvk","dr1tatoc","dr2tatoc","dr1tmfat","dr2tmfat","dr1tpfat","dr2tpfat","mcq365d")
+data1 <- wholedata[varlist]
+```
+
+```{r}
+summary(data1)
+```
+```{r}
+library(utils)
+write.table(data1, file = "data1.txt", append = FALSE, quote = TRUE, sep = " ",
+            eol = "\n", na = "NA", dec = ".", row.names = TRUE,
+            col.names = TRUE, qmethod = c("escape", "double"),
+            fileEncoding = "")
+```
+## data cleaning
+```{r}
+dtuse <- read.delim("data1.txt",sep = " ")
+dtuse <- as.data.frame(dtuse)
+summary(dtuse)
+```
+
+```{r}
+library(dplyr)
+library(car)
+
+dtuse$alq101 <- recode(dtuse$alq101, 'c(7,9) = NA')
+dtuse$alq101 <- recode(dtuse$alq101, '2 = 0')
+dtuse$smq020 <- recode(dtuse$smq020, 'c(7,9) = NA')
+dtuse$smq020 <- recode(dtuse$smq020, '2 = 0')
+dtuse$mcq160c <- recode(dtuse$mcq160c, 'c(7,9) = NA')
+dtuse$mcq160c <- recode(dtuse$mcq160c, '2 = 0')
+dtuse$paq605 <- recode(dtuse$paq605, 'c(7,9) = NA')
+dtuse$paq605 <- recode(dtuse$paq605, '2 = 0')
+dtuse$bpq020 <- recode(dtuse$bpq020, 'c(7,9) = NA')
+dtuse$bpq020 <- recode(dtuse$bpq020, '2 = 0')
+dtuse$mcq365d <- recode(dtuse$mcq365d, 'c(7,9) = NA')
+dtuse$mcq365d <- recode(dtuse$mcq365d, '2 = 0')
+
+dtuse$ttfat <- rowMeans(dtuse[,5:6], na.rm = T, dims = 1)
+dtuse$tchol <- rowMeans(dtuse[,7:8], na.rm = T, dims = 1)
+dtuse$tkcal <- rowMeans(dtuse[,9:10], na.rm = T, dims = 1)
+dtuse$tsfat <- rowMeans(dtuse[,14:15], na.rm = T, dims = 1)
+dtuse$prot <- rowMeans(dtuse[,18:19], na.rm = T, dims = 1)
+dtuse$carb <- rowMeans(dtuse[,20:21], na.rm = T, dims = 1)
+dtuse$sugr <- rowMeans(dtuse[,22:23], na.rm = T, dims = 1)
+dtuse$fibr <- rowMeans(dtuse[,24:25], na.rm = T, dims = 1)
+
+dtuse$va <- rowMeans(dtuse[,27:28], na.rm = T, dims = 1)
+dtuse$vb1 <- rowMeans(dtuse[,29:30], na.rm = T, dims = 1)
+dtuse$vb2 <- rowMeans(dtuse[,31:32], na.rm = T, dims = 1)
+dtuse$vb6 <- rowMeans(dtuse[,33:34], na.rm = T, dims = 1)
+dtuse$vb12 <- rowMeans(dtuse[,35:36], na.rm = T, dims = 1)
+dtuse$vc <- rowMeans(dtuse[,37:38], na.rm = T, dims = 1)
+dtuse$vd <- rowMeans(dtuse[,39:40], na.rm = T, dims = 1)
+dtuse$vk <- rowMeans(dtuse[,41:42], na.rm = T, dims = 1)
+dtuse$ve <- rowMeans(dtuse[,43:44], na.rm = T, dims = 1)
+dtuse$mfat <- rowMeans(dtuse[,45:46], na.rm = T, dims = 1)
+dtuse$pfat <- rowMeans(dtuse[,47:48], na.rm = T, dims = 1)
+
+dtuse$fatp <- dtuse$ttfat/dtuse$tkcal
+dtuse$tsfatp <- dtuse$tsfat/dtuse$ttfat
+
+
+varlist2 <- c("seqn", "ridageyr", "riagendr", "ridreth3","alq101", "smq020", "mcq160c", "ttfat", "tchol", "tkcal", "tsfat", "tsfatp", "fatp","bmxbmi", "paq605","prot","carb","sugr","fibr","bpq020","va","vb1","vb2","vb6","vb12","vc","vd","ve","vk","mfat","pfat","mcq365d")
+dtuse2 <- dtuse[varlist2]
+
+dtuse2 <- dtuse2[!is.na(dtuse2["mcq160c"]),]
+dtuse2 <- dtuse2[!is.na(dtuse2["ttfat"]),]
+# dtuse2 <- dtuse2[which(dtuse2$mcq365d !='1'),]
+
+summary(dtuse2)
+table(dtuse2$mcq160c)
+
+```
+
+```{r}
+dtuse2$fatq[dtuse2$fatp <=0.032865] <- 1
+dtuse2$fatq[dtuse2$fatp >=0.032865 & dtuse2$fatp<=0.038716] <- 2
+dtuse2$fatq[dtuse2$fatp >=0.038716 & dtuse2$fatp<=0.044270] <- 3
+dtuse2$fatq[dtuse2$fatp >=0.044270] <- 4
+
+dtuse2$ttfatq[dtuse2$ttfat <=50.80] <- 1
+dtuse2$ttfatq[dtuse2$ttfat >=50.80 & dtuse2$fatp<=72.72] <- 2
+dtuse2$ttfatq[dtuse2$ttfat >=72.72 & dtuse2$fatp<=98.23] <- 3
+dtuse2$ttfatq[dtuse2$ttfat >=98.23] <- 4
+
+table(dtuse2$fatq)
+table(dtuse2$ttfatq)
+```
+
+
+
+```{r}
+write.table(dtuse2, file = "dtuse2.txt", append = FALSE, quote = TRUE, sep = " ",
+            eol = "\n", na = "NA", dec = ".", row.names = TRUE,
+            col.names = TRUE, qmethod = c("escape", "double"),
+            fileEncoding = "")
+```
+
+## see class 5 demo
+## outcome
+```{r}
+#check type of variable
+class(dtuse2$mcq160c)
+#look at number of observations per level
+table(dtuse2$mcq160c)
+
+dtuse2$mcq160c[dtuse2$mcq160c=="0"]<-0
+dtuse2$mcq160c[dtuse2$mcq160c=="1"]<-1
+```
+
+# table 1
+```{r}
+library(tableone)
+
+varlist3 <- c("ridageyr", "riagendr", "ridreth3","ttfat","fatp","alq101", "smq020", "tchol", "tkcal", "bmxbmi", "paq605","fibr","bpq020","va","vb1","vb2","vb6","vb12","vc","vd", "ve","vk","mcq365d")
+catVars <- c("riagendr", "ridreth3","alq101", "smq020","paq605","bpq020","mcq365d")
+
+tab1 <- CreateTableOne(vars = varlist3, strata = "mcq160c" , data = dtuse2, factorVars = catVars)
+tab1
+
+tab1Mat <- print(tab1, quote = FALSE, noSpaces = TRUE, printToggle = FALSE)
+## Save to a CSV file
+write.csv(tab1Mat, file = "table1.csv")
+```
+
+## graph
+```{r}
+# Classic theme -- no background gridlines
+ggplot(data = dtuse2, aes(x = as.factor(mcq160c), y = ttfat)) +
+  geom_violin(aes(fill = as.factor(mcq160c))) + 
+  labs(x = F, y = "Total Fat (gm/day)",
+       title = "Total Fat Intake in People with/without CHD") +
+  theme_classic()+
+  theme(legend.position = "none", axis.title.x = element_blank())+
+  scale_x_discrete(labels=c("0" = "No CHD", "1" = "CHD"))
+  
+```
+
+## model
+```{r}
+# library(tidyverse)
+library(lmtest)
+attach(dtuse2)
+# univariate model
+uni1 <- glm(mcq160c ~ ttfat)
+summary(uni1)
+
+uni2 <- glm(mcq160c ~ fatp)
+summary(uni2)
+
+uni3 <- glm(mcq160c ~ as.factor(fatq))
+summary(uni3)
+
+uni4 <- glm(mcq160c ~ as.factor(ttfatq))
+summary(uni4)
+```
+
+```{r}
+#bmi logistic model
+log1 <- glm(mcq160c ~ ttfat+ridageyr+riagendr+ridreth3+alq101+smq020+tchol+tkcal+bmxbmi+paq605+fibr+va+vb1+vb2+vb6+vb12+vc+vd+ve+vk+mcq365d, data=dtuse2, family="binomial")
+  summary(log1)
+  vif(log1)
+  
+log2 <- glm(mcq160c ~ fatp+ridageyr+riagendr+ridreth3+alq101+smq020+tchol+bmxbmi+paq605+fibr+va+vb1+vb2+vb6+vb12+vc+vd+ve+vk+mcq365d, data=dtuse2, family="binomial")
+  summary(log2)  
+  vif(log2)
+
+log3 <- glm(mcq160c ~ as.factor(fatq)+ridageyr+riagendr+ridreth3+alq101+smq020+tchol+bmxbmi+paq605+fibr+va+vb1+vb2+vb6+vb12+vc+vd+ve+vk+mcq365d, data=dtuse2, family="binomial")
+  summary(log3) 
+  vif(log3)
+  
+log4 <- glm(mcq160c ~ as.factor(ttfatq)+ridageyr+riagendr+ridreth3+alq101+smq020+tchol+tkcal+bmxbmi+paq605+fibr+va+vb1+vb2+vb6+vb12+vc+vd+ve+vk+mcq365d, data=dtuse2, family="binomial")
+  summary(log4)
+  vif(log4)
+
+```
+
+
+```{r}
+#calculate and print ORs and 95% CIs
+  ORfatq<-exp(cbind(OR = coef(log1), confint(log1))) #calculate ORs and 95% CIs
+  ORfatq #print ORs and 95% CIs
+
+  ORfatq<-exp(cbind(OR = coef(log2), confint(log2))) #calculate ORs and 95% CIs
+  ORfatq #print ORs and 95% CIs
+
+  ORfatq<-exp(cbind(OR = coef(log3), confint(log3))) #calculate ORs and 95% CIs
+  ORfatq #print ORs and 95% CIs
+  
+  ORfatq<-exp(cbind(OR = coef(log4), confint(log4))) #calculate ORs and 95% CIs
+  ORfatq #print ORs and 95% CIs
+```
+
+
