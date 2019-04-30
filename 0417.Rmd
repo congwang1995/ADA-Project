@@ -15,6 +15,7 @@ library(knitr) #for creating nicer tables
 library(gdata)
 library(data.table)
 
+# import datasets
 demo <- sasxport.get("DEMO_I.xpt")
 diet1 <- sasxport.get("DR1TOT_I.xpt")
 diet2 <- sasxport.get("DR2TOT_I.xpt")
@@ -25,7 +26,7 @@ bmi <- sasxport.get("BMX_I.xpt")
 pa <- sasxport.get("PAQ_I.xpt")
 hyp <- sasxport.get("BPQ_I.xpt")
 
-
+# merge datasets
 diet <- merge(diet1, diet2, by = 'seqn', all = T, sort = T)
 alcsmk <- merge(alc, smoke, by = 'seqn', all = T, sort = T)
 demochd <- merge(demo, chd, by = 'seqn', all = T, sort = T)
@@ -35,14 +36,17 @@ wholedata <- merge(wholedata, bmi, by = 'seqn', all = T, sort = T)
 wholedata <- merge(wholedata, pa, by = 'seqn', all = T, sort = T)
 wholedata <- merge(wholedata, hyp, by = 'seqn', all = T, sort = T)
 
+# select and check vars
 varlist <- c("seqn", "ridageyr", "riagendr", "ridreth3", "dr1ttfat", "dr2ttfat", "dr1tchol", "dr2tchol", "dr1tkcal", "dr2tkcal", "alq101", "smq020", "mcq160c", "dr1tsfat", "dr2tsfat", "bmxbmi", "paq605", "dr1tprot", "dr2tprot", "dr1tcarb","dr2tcarb", "dr1tsugr","dr2tsugr", "dr1tfibe","dr2tfibe","bpq020","dr1tvara","dr2tvara","dr1tvb1","dr2tvb1","dr1tvb2","dr2tvb2","dr1tvb6","dr2tvb6","dr1tvb12","dr2tvb12","dr1tvc","dr2tvc","dr1tvd","dr2tvd","dr1tvk","dr2tvk","dr1tatoc","dr2tatoc","dr1tmfat","dr2tmfat","dr1tpfat","dr2tpfat","mcq365d")
 data1 <- wholedata[varlist]
 ```
 
 ```{r}
+# check vars
 summary(data1)
 ```
 ```{r}
+# save the data
 library(utils)
 write.table(data1, file = "data1.txt", append = FALSE, quote = TRUE, sep = " ",
             eol = "\n", na = "NA", dec = ".", row.names = TRUE,
@@ -51,6 +55,7 @@ write.table(data1, file = "data1.txt", append = FALSE, quote = TRUE, sep = " ",
 ```
 ## data cleaning
 ```{r}
+# import the saved data and check
 dtuse <- read.delim("data1.txt",sep = " ")
 dtuse <- as.data.frame(dtuse)
 summary(dtuse)
@@ -60,6 +65,7 @@ summary(dtuse)
 library(dplyr)
 library(car)
 
+# data cleaning, deleting missing and dk
 dtuse$alq101 <- recode(dtuse$alq101, 'c(7,9) = NA')
 dtuse$alq101 <- recode(dtuse$alq101, '2 = 0')
 dtuse$smq020 <- recode(dtuse$smq020, 'c(7,9) = NA')
@@ -73,6 +79,7 @@ dtuse$bpq020 <- recode(dtuse$bpq020, '2 = 0')
 dtuse$mcq365d <- recode(dtuse$mcq365d, 'c(7,9) = NA')
 dtuse$mcq365d <- recode(dtuse$mcq365d, '2 = 0')
 
+# calculate means of dietary vars from day1 and day2
 dtuse$ttfat <- rowMeans(dtuse[,5:6], na.rm = T, dims = 1)
 dtuse$tchol <- rowMeans(dtuse[,7:8], na.rm = T, dims = 1)
 dtuse$tkcal <- rowMeans(dtuse[,9:10], na.rm = T, dims = 1)
@@ -94,23 +101,27 @@ dtuse$ve <- rowMeans(dtuse[,43:44], na.rm = T, dims = 1)
 dtuse$mfat <- rowMeans(dtuse[,45:46], na.rm = T, dims = 1)
 dtuse$pfat <- rowMeans(dtuse[,47:48], na.rm = T, dims = 1)
 
+# create new vars of fat/kcal
 dtuse$fatp <- dtuse$ttfat/dtuse$tkcal
 dtuse$tsfatp <- dtuse$tsfat/dtuse$ttfat
 
-
+# select vars potentially to the final model
 varlist2 <- c("seqn", "ridageyr", "riagendr", "ridreth3","alq101", "smq020", "mcq160c", "ttfat", "tchol", "tkcal", "tsfat", "tsfatp", "fatp","bmxbmi", "paq605","prot","carb","sugr","fibr","bpq020","va","vb1","vb2","vb6","vb12","vc","vd","ve","vk","mfat","pfat","mcq365d")
 dtuse2 <- dtuse[varlist2]
 
+# delete obs with missing in my major interest DV &IV
 dtuse2 <- dtuse2[!is.na(dtuse2["mcq160c"]),]
 dtuse2 <- dtuse2[!is.na(dtuse2["ttfat"]),]
 # dtuse2 <- dtuse2[which(dtuse2$mcq365d !='1'),]
 
+# check vars (prepare for quratiles) and DV
 summary(dtuse2)
 table(dtuse2$mcq160c)
 
 ```
 
 ```{r}
+# generate vars of fat intake in quartiles
 dtuse2$fatq[dtuse2$fatp <=0.032865] <- 1
 dtuse2$fatq[dtuse2$fatp >=0.032865 & dtuse2$fatp<=0.038716] <- 2
 dtuse2$fatq[dtuse2$fatp >=0.038716 & dtuse2$fatp<=0.044270] <- 3
@@ -121,6 +132,7 @@ dtuse2$ttfatq[dtuse2$ttfat >=50.80 & dtuse2$fatp<=72.72] <- 2
 dtuse2$ttfatq[dtuse2$ttfat >=72.72 & dtuse2$fatp<=98.23] <- 3
 dtuse2$ttfatq[dtuse2$ttfat >=98.23] <- 4
 
+# check numbers
 table(dtuse2$fatq)
 table(dtuse2$ttfatq)
 ```
@@ -128,6 +140,7 @@ table(dtuse2$ttfatq)
 
 
 ```{r}
+# save the final data
 write.table(dtuse2, file = "dtuse2.txt", append = FALSE, quote = TRUE, sep = " ",
             eol = "\n", na = "NA", dec = ".", row.names = TRUE,
             col.names = TRUE, qmethod = c("escape", "double"),
@@ -148,6 +161,7 @@ dtuse2$mcq160c[dtuse2$mcq160c=="1"]<-1
 
 # table 1
 ```{r}
+# create table one
 library(tableone)
 
 varlist3 <- c("ridageyr", "riagendr", "ridreth3","ttfat","fatp","alq101", "smq020", "tchol", "tkcal", "bmxbmi", "paq605","fibr","bpq020","va","vb1","vb2","vb6","vb12","vc","vd", "ve","vk","mcq365d")
@@ -161,7 +175,7 @@ tab1Mat <- print(tab1, quote = FALSE, noSpaces = TRUE, printToggle = FALSE)
 write.csv(tab1Mat, file = "table1.csv")
 ```
 
-## graph
+## violin graph of total fat (continuous) with CHD
 ```{r}
 # Classic theme -- no background gridlines
 ggplot(data = dtuse2, aes(x = as.factor(mcq160c), y = ttfat)) +
@@ -194,7 +208,7 @@ summary(uni4)
 ```
 
 ```{r}
-#bmi logistic model
+# multivariate logistic model
 log1 <- glm(mcq160c ~ ttfat+ridageyr+riagendr+ridreth3+alq101+smq020+tchol+tkcal+bmxbmi+paq605+fibr+va+vb1+vb2+vb6+vb12+vc+vd+ve+vk+mcq365d, data=dtuse2, family="binomial")
   summary(log1)
   vif(log1)
